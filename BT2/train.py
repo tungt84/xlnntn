@@ -28,6 +28,8 @@ df_val = df_val.dropna()
 Sentences = df_train["premise"].to_list()
 Sentences.extend(df_train["hypothesis"].to_list())
 
+# tokenize it đi 60 epochs
+#mô hình t5 
 tokenizer = Tokenizer(WordLevel(unk_token="[UNK]"))
 tokenizer.pre_tokenizer = Sequence([Whitespace(), Punctuation()])
 tokenizer.post_processor = processors.TemplateProcessing(
@@ -41,6 +43,7 @@ tokenizer.post_processor = processors.TemplateProcessing(
         ("[MASK]", 4)
     ],
 )
+
 
 trainer = WordLevelTrainer(
     special_tokens=["[UNK]", "[CLS]", "[SEP]", "[PAD]", "[MASK]"],
