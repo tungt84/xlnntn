@@ -1,2 +1,3 @@
 BT2/MODEL/model.safetensors
 */.DS_Store
+.venv/*
