@@ -5,14 +5,15 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader
 
 from tokenizers import Tokenizer, processors
-from tokenizers.models import WordLevel
-from tokenizers.trainers import WordLevelTrainer
+from tokenizers.models import BPE
+from tokenizers.trainers import BpeTrainer
 from tokenizers.pre_tokenizers import Sequence, Whitespace, Punctuation
 
-from transformers import PreTrainedTokenizerFast, Trainer, TrainingArguments
+from transformers import PreTrainedTokenizerFast, Trainer, TrainingArguments, get_last_checkpoint
 
 from datasets import load_dataset, Dataset
-
+from tokenizers.models import WordPiece
+from tokenizers.trainers import WordPieceTrainer
 from model import *
 
 import evaluate
@@ -28,9 +29,8 @@ df_val = df_val.dropna()
 Sentences = df_train["premise"].to_list()
 Sentences.extend(df_train["hypothesis"].to_list())
 
-# tokenize it đi 60 epochs
-#mô hình t5 
-tokenizer = Tokenizer(WordLevel(unk_token="[UNK]"))
+
+tokenizer = Tokenizer(BPE(unk_token="[UNK]"))
 tokenizer.pre_tokenizer = Sequence([Whitespace(), Punctuation()])
 tokenizer.post_processor = processors.TemplateProcessing(
     single="[CLS] $A [SEP]",
@@ -45,7 +45,7 @@ tokenizer.post_processor = processors.TemplateProcessing(
 )
 
 
-trainer = WordLevelTrainer(
+trainer = BpeTrainer(
     special_tokens=["[UNK]", "[CLS]", "[SEP]", "[PAD]", "[MASK]"],
     min_frequency=2
 )
@@ -117,5 +117,15 @@ trainer = Trainer(
     compute_metrics=compute_metrics,
 )
 
-trainer.train()
+last_checkpoint = None
+try:
+    last_checkpoint = get_last_checkpoint(args.output_dir)
+except Exception:
+    last_checkpoint = None
+
+if last_checkpoint is not None:
+    print(f"Resuming training from checkpoint: {last_checkpoint}")
+    trainer.train(resume_from_checkpoint=last_checkpoint)
+else:
+    trainer.train()
 model.save_pretrained("./MODEL")

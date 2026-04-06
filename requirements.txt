@@ -1,4 +1,5 @@
 torch==2.5.1
+#transformers==4.38.2
 transformers==4.57.3
 scikit-learn
 scipy
@@ -7,3 +8,4 @@ datasets>=2.0.0
 evaluate>=0.4.0
 numpy>=1.24.0
 pandas>=2.0.0
+accelerate>=0.26.0

@@ -1,0 +1,15 @@
+# Accelerate config for Colab T4 (3 GPUs) - saved as accelerate_config.yaml
+# Use with: `accelerate launch --config_file accelerate_config.yaml train.py`
+
+compute_environment: LOCAL_MACHINE
+distributed_type: MULTI_GPU
+mixed_precision: fp16
+num_machines: 1
+num_processes: 3
+machine_rank: 0
+main_process_ip: null
+main_process_port: null
+use_cpu: false
+deepspeed_config: {}
+fsdp_config: {}
+downcast_bf16: false
