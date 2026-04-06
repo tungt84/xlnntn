@@ -9,7 +9,36 @@ from tokenizers.models import BPE
 from tokenizers.trainers import BpeTrainer
 from tokenizers.pre_tokenizers import Sequence, Whitespace, Punctuation
 
-from transformers import PreTrainedTokenizerFast, Trainer, TrainingArguments, get_last_checkpoint
+from transformers import PreTrainedTokenizerFast, Trainer, TrainingArguments
+
+# `get_last_checkpoint` location changed across transformers versions —
+# try importing it from the main package, then `trainer_utils`, then
+# fall back to a simple filesystem-based implementation.
+try:
+    from transformers import get_last_checkpoint
+except Exception:
+    try:
+        from transformers.trainer_utils import get_last_checkpoint
+    except Exception:
+        import os
+        import re
+
+        def get_last_checkpoint(output_dir):
+            if not os.path.isdir(output_dir):
+                return None
+            checkpoints = [d for d in os.listdir(output_dir)
+                           if os.path.isdir(os.path.join(output_dir, d)) and d.startswith("checkpoint")]
+            if not checkpoints:
+                return None
+
+            def keyfn(name):
+                m = re.search(r"checkpoint-?(\d+)", name)
+                if m:
+                    return int(m.group(1))
+                return 0
+
+            checkpoints.sort(key=keyfn)
+            return os.path.join(output_dir, checkpoints[-1])
 
 from datasets import load_dataset, Dataset
 from tokenizers.models import WordPiece
