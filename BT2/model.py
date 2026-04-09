@@ -28,7 +28,8 @@ class NLI(PreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.config = config
-        self.embedding = nn.Embedding(config.vocab_size, config.hidden_size)
+        # ensure padding token embedding is zeroed and not updated (pad id = 3)
+        self.embedding = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=3)
         self.lstm = nn.LSTM(config.hidden_size, config.hidden_size, batch_first=True)
         self.fc = nn.Linear(config.hidden_size, config.nclass)
         self.loss_fct = nn.CrossEntropyLoss()
