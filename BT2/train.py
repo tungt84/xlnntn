@@ -40,19 +40,23 @@ except Exception:
             checkpoints.sort(key=keyfn)
             return os.path.join(output_dir, checkpoints[-1])
 
-from datasets import load_dataset, Dataset
+from datasets import load_from_disk, Dataset
+from pathlib import Path
 from tokenizers.models import WordPiece
 from tokenizers.trainers import WordPieceTrainer
 from model import *
 
 import evaluate
 
-mnli = load_dataset("nyu-mll/multi_nli")
+# Load pre-downloaded dataset splits from disk (saved under DATASETS/multi_nli)
+data_base = Path(__file__).resolve().parents[1] / "DATASETS" / "multi_nli"
+train_ds = load_from_disk(str(data_base / "train"))
+val_ds = load_from_disk(str(data_base / "validation_matched"))
 
-df_train = mnli['train'].to_pandas()
+df_train = train_ds.to_pandas()
 df_train = df_train.dropna()
 
-df_val = mnli['validation_matched'].to_pandas()
+df_val = val_ds.to_pandas()
 df_val = df_val.dropna()
 
 Sentences = df_train["premise"].to_list()
