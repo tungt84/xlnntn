@@ -28,8 +28,7 @@ class NLI(PreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.config = config
-        # ensure padding token embedding is zeroed and not updated (pad id = 3)
-        self.embedding = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=3)
+        self.embedding = nn.Embedding(config.vocab_size, config.hidden_size)
         self.lstm = nn.LSTM(config.hidden_size, config.hidden_size, batch_first=True)
         self.fc = nn.Linear(config.hidden_size, config.nclass)
         self.loss_fct = nn.CrossEntropyLoss()
@@ -46,15 +45,12 @@ class NLI(PreTrainedModel):
             enforce_sorted=False
         )
 
-        # pass the packed sequence into LSTM so padding isn't processed
-        output_packed, (h, c) = self.lstm(packed)
-        # take the last layer's final hidden state: shape (batch, hidden_size)
-        h = h[-1]
-        logits = self.fc(h)  # (batch, nclass)
+        output, (h, c) = self.lstm(packed)
+        h = torch.squeeze(h)
+        logits = self.fc(h) # (batch, seq_len, vocab_size)
 
         loss = None
         if labels is not None:
             loss = self.loss_fct(logits, labels)
 
         return SequenceClassifierOutput(loss=loss, logits=logits)
-
