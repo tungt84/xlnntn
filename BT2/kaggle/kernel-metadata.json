@@ -1,6 +1,6 @@
 {
-  "id": "tungtran2026/nli-model-for-bt2-v1",
-  "title": "NLI Model for BT2 v1",
+  "id": "tungtran2026/nli-model-for-bt2-v2",
+  "title": "NLI Model for BT2 v2",
   "code_file": "nli-bt2.ipynb",
   "language": "python",
   "kernel_type": "notebook",
