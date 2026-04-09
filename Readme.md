@@ -19,3 +19,11 @@ II. Tokenizer và kiến trúc mô hình. Xây dựng một tokenizer để phâ
 Gợi ý:
 - Tokenizer đang dùng WordLevel quá lớn  chọn phương án khác 
 - Huấn luyện mô hình t5 ?
+
+**Update (BT2/model.py)**: Tôi đã chỉnh sửa `BT2/model.py` để cải thiện biểu diễn câu và độ ổn định huấn luyện:
+- Truyền `packed` vào `self.lstm(...)` thay vì tensor có padding — LSTM sẽ bỏ qua token padding khi tính toán trạng thái ẩn.
+- Thay `torch.squeeze(h)` bằng `h = h[-1]` để lấy trạng thái ẩn của layer cuối với shape `(batch, hidden_size)` an toàn cho mọi `batch_size`.
+
+Lý do: trước đó `pack_padded_sequence` được tạo nhưng không được sử dụng, và `squeeze()` có thể làm sai kích thước khi `batch_size==1`. Việc dùng packed sequence loại nhiễu từ padding và lấy `h[-1]` cho biểu diễn cuối cùng chính xác hơn, giúp lớp phân loại nhận đặc trưng tốt hơn — kỳ vọng tăng F1 trên validation.
+
+Hướng dẫn: sau khi pull thay đổi, chạy lại `BT2/train.py` để đánh giá cải thiện F1.

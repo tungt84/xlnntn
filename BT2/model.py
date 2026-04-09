@@ -45,9 +45,11 @@ class NLI(PreTrainedModel):
             enforce_sorted=False
         )
 
-        output, (h, c) = self.lstm(x)
-        h = torch.squeeze(h)
-        logits = self.fc(h) # (batch, seq_len, vocab_size)
+        # pass the packed sequence into LSTM so padding isn't processed
+        output_packed, (h, c) = self.lstm(packed)
+        # take the last layer's final hidden state: shape (batch, hidden_size)
+        h = h[-1]
+        logits = self.fc(h)  # (batch, nclass)
 
         loss = None
         if labels is not None:
