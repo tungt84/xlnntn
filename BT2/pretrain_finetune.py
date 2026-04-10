@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 import numpy as np
 import torch
+import shutil
 
 from datasets import load_from_disk, Dataset
 from tokenizers import Tokenizer, processors
@@ -194,6 +195,20 @@ def main():
     print("Starting pretraining on SNLI...")
     trainer.train()
     trainer.save_model(str(pretrain_out))
+
+    # remove training snapshot/checkpoint folders to avoid accidental resume
+    def clear_checkpoints(dir_path: Path):
+        if not dir_path.exists():
+            return
+        for p in dir_path.iterdir():
+            if p.is_dir() and p.name.startswith("checkpoint"):
+                try:
+                    print(f"Removing checkpoint snapshot: {p}")
+                    shutil.rmtree(p)
+                except Exception as e:
+                    print(f"Failed to remove {p}: {e}")
+
+    clear_checkpoints(pretrain_out)
 
     # Fine-tune on MultiNLI
     finetune_out = root / "NLIMODEL" / "finetune"
