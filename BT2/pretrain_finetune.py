@@ -15,6 +15,23 @@ from model import NLI, NLIConfig
 import evaluate
 
 
+def make_training_args(**kwargs):
+    try:
+        return TrainingArguments(**kwargs)
+    except TypeError as e:
+        msg = str(e)
+        if 'evaluation_strategy' in kwargs:
+            kwargs.pop('evaluation_strategy')
+            try:
+                return TrainingArguments(**kwargs)
+            except TypeError:
+                pass
+        # fallback: remove newer keys that might not exist
+        for k in ('load_best_model_at_end', 'save_strategy'):
+            kwargs.pop(k, None)
+        return TrainingArguments(**kwargs)
+
+
 def load_disk_dataset(base_path: Path, split_name: str):
     p = base_path / split_name
     if not p.exists():
