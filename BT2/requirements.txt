@@ -1,4 +1,4 @@
-torch==2.5.1
+torch==2.6.0
 #transformers==4.38.2
 transformers==4.57.3
 scikit-learn
@@ -9,3 +9,5 @@ evaluate>=0.4.0
 numpy>=1.24.0
 pandas>=2.0.0
 accelerate>=0.26.0
+torchvision==0.21.0
+torchaudio==2.6.0 

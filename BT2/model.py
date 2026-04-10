@@ -45,7 +45,7 @@ class NLI(PreTrainedModel):
             enforce_sorted=False
         )
 
-        output, (h, c) = self.lstm(packed)
+        output, (h, c) = self.lstm(x)
         h = torch.squeeze(h)
         logits = self.fc(h) # (batch, seq_len, vocab_size)
 
