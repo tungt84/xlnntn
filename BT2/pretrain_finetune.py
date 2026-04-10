@@ -16,20 +16,11 @@ import evaluate
 
 
 def make_training_args(**kwargs):
-    try:
-        return TrainingArguments(**kwargs)
-    except TypeError as e:
-        msg = str(e)
-        if 'evaluation_strategy' in kwargs:
-            kwargs.pop('evaluation_strategy')
-            try:
-                return TrainingArguments(**kwargs)
-            except TypeError:
-                pass
-        # fallback: remove newer keys that might not exist
-        for k in ('load_best_model_at_end', 'save_strategy'):
-            kwargs.pop(k, None)
-        return TrainingArguments(**kwargs)
+    import inspect
+    sig = inspect.signature(TrainingArguments)
+    allowed = set(sig.parameters.keys())
+    filtered = {k: v for k, v in kwargs.items() if k in allowed}
+    return TrainingArguments(**filtered)
 
 
 def load_disk_dataset(base_path: Path, split_name: str):
@@ -186,7 +177,7 @@ def main():
 
     model = NLI(NLIConfig(vocab_size=len(hf_tokenizer.get_vocab())))
 
-    pretrain_args = TrainingArguments(
+    pretrain_args = make_training_args(
         output_dir=str(pretrain_out),
         per_device_train_batch_size=32,
         learning_rate=0.001,
@@ -235,7 +226,7 @@ def main():
     model_finetune = NLI(NLIConfig(vocab_size=len(hf_tokenizer.get_vocab())))
     model_finetune = model_finetune.from_pretrained(str(pretrain_out))
 
-    finetune_args = TrainingArguments(
+    finetune_args = make_training_args(
         output_dir=str(finetune_out),
         per_device_train_batch_size=16,
         learning_rate=1e-4,
