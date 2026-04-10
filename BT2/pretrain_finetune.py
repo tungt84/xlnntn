@@ -177,6 +177,11 @@ def main():
 
     model = NLI(NLIConfig(vocab_size=len(hf_tokenizer.get_vocab())))
 
+    # determine evaluation/save strategy compatibility
+    eval_strategy = "epoch" if snli_val_ds is not None else "no"
+    save_strategy = "epoch" if eval_strategy != "no" else "no"
+    load_best = True if eval_strategy != "no" else False
+
     pretrain_args = make_training_args(
         output_dir=str(pretrain_out),
         per_device_train_batch_size=32,
@@ -184,9 +189,9 @@ def main():
         weight_decay=0.01,
         num_train_epochs=5,
         eval_steps=None,
-        evaluation_strategy="epoch" if snli_val_ds is not None else "no",
-        save_strategy="epoch",
-        load_best_model_at_end=True,
+        evaluation_strategy=eval_strategy,
+        save_strategy=save_strategy,
+        load_best_model_at_end=load_best,
     )
 
     trainer = Trainer(
@@ -226,6 +231,7 @@ def main():
     model_finetune = NLI(NLIConfig(vocab_size=len(hf_tokenizer.get_vocab())))
     model_finetune = model_finetune.from_pretrained(str(pretrain_out))
 
+    # finetune uses evaluation by default (MultiNLI validation should exist)
     finetune_args = make_training_args(
         output_dir=str(finetune_out),
         per_device_train_batch_size=16,
