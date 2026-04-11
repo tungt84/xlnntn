@@ -15,12 +15,8 @@ from model import NLI, NLIConfig
 import evaluate
 
 
-def make_training_args(**kwargs):
-    import inspect
-    sig = inspect.signature(TrainingArguments)
-    allowed = set(sig.parameters.keys())
-    filtered = {k: v for k, v in kwargs.items() if k in allowed}
-    return TrainingArguments(**filtered)
+# NOTE: Use the same TrainingArguments parameter names as in BT2/train.py
+# No fallback: construct TrainingArguments directly to match train.py.
 
 
 def load_disk_dataset(base_path: Path, split_name: str):
@@ -177,21 +173,16 @@ def main():
 
     model = NLI(NLIConfig(vocab_size=len(hf_tokenizer.get_vocab())))
 
-    # determine evaluation/save strategy compatibility
-    eval_strategy = "epoch" if snli_val_ds is not None else "no"
-    save_strategy = "epoch" if eval_strategy != "no" else "no"
-    load_best = True if eval_strategy != "no" else False
-
-    pretrain_args = make_training_args(
+    pretrain_args = TrainingArguments(
         output_dir=str(pretrain_out),
+        load_best_model_at_end=True,
+        dataloader_pin_memory=True,
         per_device_train_batch_size=32,
         learning_rate=0.001,
         weight_decay=0.01,
         num_train_epochs=5,
-        eval_steps=None,
-        evaluation_strategy=eval_strategy,
-        save_strategy=save_strategy,
-        load_best_model_at_end=load_best,
+        eval_strategy="epoch",
+        save_strategy="epoch",
     )
 
     trainer = Trainer(
@@ -231,16 +222,16 @@ def main():
     model_finetune = NLI(NLIConfig(vocab_size=len(hf_tokenizer.get_vocab())))
     model_finetune = model_finetune.from_pretrained(str(pretrain_out))
 
-    # finetune uses evaluation by default (MultiNLI validation should exist)
-    finetune_args = make_training_args(
+    finetune_args = TrainingArguments(
         output_dir=str(finetune_out),
+        load_best_model_at_end=True,
+        dataloader_pin_memory=True,
         per_device_train_batch_size=16,
         learning_rate=1e-4,
         weight_decay=0.01,
         num_train_epochs=10,
-        evaluation_strategy="epoch",
+        eval_strategy="epoch",
         save_strategy="epoch",
-        load_best_model_at_end=True,
     )
 
     trainer_ft = Trainer(
