@@ -66,8 +66,8 @@ df_train = df_train.dropna()
 df_val = val_ds.to_pandas()
 df_val = df_val.dropna()
 
-# Use pretrained English tokenizer (roberta-base)
-tokenizer = AutoTokenizer.from_pretrained("roberta-base")
+# Use pretrained English tokenizer (small model to meet 40M param limit)
+tokenizer = AutoTokenizer.from_pretrained("albert-base-v2")
 tokenizer.save_pretrained("./MODEL")
 
 def collate_fn(batch):
@@ -109,7 +109,7 @@ val_set = Dataset.from_dict({
     "labels": df_val["label"].tolist(),
 })
 
-model = AutoModelForSequenceClassification.from_pretrained("roberta-base", num_labels=3)
+model = AutoModelForSequenceClassification.from_pretrained("albert-base-v2", num_labels=3)
 
 allparams = sum(p.numel() for p in model.parameters())
 trainparams = sum(p.numel() for p in model.parameters() if p.requires_grad)
