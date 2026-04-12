@@ -39,30 +39,36 @@ class NLI(PreTrainedModel):
         # - if this model instance has a pretrained encoder attribute (e.g., self.encoder),
         #   use it with possible attention_mask passed via kwargs.
         # - otherwise, fallback to the original embedding+LSTM classifier.
+        attention_mask = kwargs.get("attention_mask", None)
         if hasattr(self, "encoder"):
-            attention_mask = kwargs.get("attention_mask", None)
             outputs = self.encoder(input_ids=input_ids, attention_mask=attention_mask, return_dict=True)
             pooled = getattr(outputs, "pooler_output", None)
             if pooled is None:
                 pooled = outputs.last_hidden_state[:, 0, :]
-            # optional dropout if present
             if hasattr(self, "dropout"):
                 pooled = self.dropout(pooled)
             logits = self.fc(pooled)
         else:
             # original LSTM path
+            # if lengths not provided, try to compute from attention_mask
+            if (lengths is None or (isinstance(lengths, torch.Tensor) and lengths.numel() == 0)) and attention_mask is not None:
+                lengths = attention_mask.long().sum(dim=1)
+
             x = self.embedding(input_ids)
 
+            # use packed sequence for LSTM to ignore padding positions
             packed = pack_padded_sequence(
                 x,
                 lengths.to("cpu"),
                 batch_first=True,
-                enforce_sorted=False
+                enforce_sorted=False,
             )
 
-            output, (h, c) = self.lstm(x)
-            h = torch.squeeze(h)
-            logits = self.fc(h) # (batch, seq_len, vocab_size)
+            packed_out, (h, c) = self.lstm(packed)
+            # h shape: (num_layers * num_directions, batch, hidden_size)
+            # take last layer's hidden state
+            last_hidden = h[-1]
+            logits = self.fc(last_hidden)  # (batch, nclass)
 
         loss = None
         if labels is not None:
