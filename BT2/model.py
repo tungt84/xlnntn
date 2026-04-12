@@ -35,19 +35,34 @@ class NLI(PreTrainedModel):
         self.post_init()
 
     def forward(self, input_ids, lengths, labels=None, **kwargs):
-        # 1. Forward pass
-        x = self.embedding(input_ids)
+        # Support two modes:
+        # - if this model instance has a pretrained encoder attribute (e.g., self.encoder),
+        #   use it with possible attention_mask passed via kwargs.
+        # - otherwise, fallback to the original embedding+LSTM classifier.
+        if hasattr(self, "encoder"):
+            attention_mask = kwargs.get("attention_mask", None)
+            outputs = self.encoder(input_ids=input_ids, attention_mask=attention_mask, return_dict=True)
+            pooled = getattr(outputs, "pooler_output", None)
+            if pooled is None:
+                pooled = outputs.last_hidden_state[:, 0, :]
+            # optional dropout if present
+            if hasattr(self, "dropout"):
+                pooled = self.dropout(pooled)
+            logits = self.fc(pooled)
+        else:
+            # original LSTM path
+            x = self.embedding(input_ids)
 
-        packed = pack_padded_sequence(
-            x,
-            lengths.to("cpu"),
-            batch_first=True,
-            enforce_sorted=False
-        )
+            packed = pack_padded_sequence(
+                x,
+                lengths.to("cpu"),
+                batch_first=True,
+                enforce_sorted=False
+            )
 
-        output, (h, c) = self.lstm(x)
-        h = torch.squeeze(h)
-        logits = self.fc(h) # (batch, seq_len, vocab_size)
+            output, (h, c) = self.lstm(x)
+            h = torch.squeeze(h)
+            logits = self.fc(h) # (batch, seq_len, vocab_size)
 
         loss = None
         if labels is not None:

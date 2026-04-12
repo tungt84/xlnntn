@@ -9,7 +9,14 @@ from tokenizers.models import BPE
 from tokenizers.trainers import BpeTrainer
 from tokenizers.pre_tokenizers import Sequence, Whitespace, Punctuation
 
-from transformers import PreTrainedTokenizerFast, Trainer, TrainingArguments
+from transformers import (
+    PreTrainedTokenizerFast,
+    Trainer,
+    TrainingArguments,
+    AutoTokenizer,
+    AutoModelForSequenceClassification,
+    EvalPrediction,
+)
 
 # `get_last_checkpoint` location changed across transformers versions —
 # try importing it from the main package, then `trainer_utils`, then
@@ -59,73 +66,50 @@ df_train = df_train.dropna()
 df_val = val_ds.to_pandas()
 df_val = df_val.dropna()
 
-Sentences = df_train["premise"].to_list()
-Sentences.extend(df_train["hypothesis"].to_list())
-
-
-tokenizer = Tokenizer(BPE(unk_token="[UNK]"))
-tokenizer.pre_tokenizer = Sequence([Whitespace(), Punctuation()])
-tokenizer.post_processor = processors.TemplateProcessing(
-    single="[CLS] $A [SEP]",
-    pair="[CLS] $A [SEP] $B:1 [SEP]:1",
-    special_tokens=[
-        ("[UNK]", 0),
-        ("[CLS]", 1),
-        ("[SEP]", 2),
-        ("[PAD]", 3),
-        ("[MASK]", 4)
-    ],
-)
-
-
-trainer = BpeTrainer(
-    special_tokens=["[UNK]", "[CLS]", "[SEP]", "[PAD]", "[MASK]"],
-    min_frequency=2
-)
-
-tokenizer.train_from_iterator(Sentences, trainer=trainer, length=len(Sentences))
-
-hf_tokenizer = PreTrainedTokenizerFast(
-    tokenizer_object=tokenizer,
-    unk_token="[UNK]",
-    pad_token="[PAD]",
-    cls_token="[CLS]",
-    sep_token="[SEP]",
-    mask_token="[MASK]"
-)
-
-
-hf_tokenizer.save_pretrained("./MODEL")
+# Use pretrained English tokenizer (roberta-base)
+tokenizer = AutoTokenizer.from_pretrained("roberta-base")
+tokenizer.save_pretrained("./MODEL")
 
 def collate_fn(batch):
     input_ids = torch.tensor([x["input_ids"] for x in batch])
-    lengths = torch.tensor([len(x["input_ids"]) for x in batch])
+    attention_mask = torch.tensor([x["attention_mask"] for x in batch])
     labels = torch.tensor([x["labels"] for x in batch])
-    return {"input_ids": input_ids, "lengths":lengths, "labels": labels}
+    return {"input_ids": input_ids, "attention_mask": attention_mask, "labels": labels}
 
-def tokenizes(examples):
-    return hf_tokenizer(examples, truncation=True, max_length=128, padding="max_length")
+def tokenizes_pair(premise, hypothesis):
+    return tokenizer(premise, hypothesis, truncation=True, max_length=128, padding="max_length")
     
-def compute_metrics(results):
-	pred, targ = results
-	pred = np.argmax(pred, axis=-1)
-	res = {}
-	metric = evaluate.load("accuracy")
-	res["accuracy"] = metric.compute(predictions=pred, references=targ)["accuracy"]
-	metric = evaluate.load("precision")
-	res["precision"] = metric.compute(predictions=pred, references=targ, average="macro", zero_division=0)["precision"]
-	metric = evaluate.load("recall")
-	res["recall"] = metric.compute(predictions=pred, references=targ, average="macro", zero_division=0)["recall"]
-	metric = evaluate.load("f1")
-	res["f1"] = metric.compute(predictions=pred, references=targ, average="macro")["f1"]
-	return res
+def compute_metrics(p: EvalPrediction):
+    preds = p.predictions
+    if isinstance(preds, tuple):
+        preds = preds[0]
+    pred_labels = np.argmax(preds, axis=-1)
+    targ = p.label_ids
+    res = {}
+    metric = evaluate.load("accuracy")
+    res["accuracy"] = metric.compute(predictions=pred_labels, references=targ)["accuracy"]
+    metric = evaluate.load("precision")
+    res["precision"] = metric.compute(predictions=pred_labels, references=targ, average="macro", zero_division=0)["precision"]
+    metric = evaluate.load("recall")
+    res["recall"] = metric.compute(predictions=pred_labels, references=targ, average="macro", zero_division=0)["recall"]
+    metric = evaluate.load("f1")
+    res["f1"] = metric.compute(predictions=pred_labels, references=targ, average="macro")["f1"]
+    return res
 	
-tokenized_train = (df_train["premise"] + " [CLS] " + df_train["hypothesis"]).apply(tokenizes)
-train_set = Dataset.from_dict({"input_ids":[t["input_ids"] for t in tokenized_train], "labels":df_train["label"]})
-tokenized_val = (df_val["premise"] + " [CLS] " + df_val["hypothesis"]).apply(tokenizes)
-val_set = Dataset.from_dict({"input_ids":[t["input_ids"] for t in tokenized_val], "labels":df_val["label"]})
+tokenized_train = df_train.apply(lambda x: tokenizes_pair(x["premise"], x["hypothesis"]), axis=1)
+train_set = Dataset.from_dict({
+    "input_ids": [t["input_ids"] for t in tokenized_train],
+    "attention_mask": [t["attention_mask"] for t in tokenized_train],
+    "labels": df_train["label"].tolist(),
+})
+tokenized_val = df_val.apply(lambda x: tokenizes_pair(x["premise"], x["hypothesis"]), axis=1)
+val_set = Dataset.from_dict({
+    "input_ids": [t["input_ids"] for t in tokenized_val],
+    "attention_mask": [t["attention_mask"] for t in tokenized_val],
+    "labels": df_val["label"].tolist(),
+})
 
-model = NLI(NLIConfig(vocab_size=len(hf_tokenizer.get_vocab())))
+model = AutoModelForSequenceClassification.from_pretrained("roberta-base", num_labels=3)
 
 allparams = sum(p.numel() for p in model.parameters())
 trainparams = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -133,10 +117,10 @@ print("All Param:", allparams, "Train Params:", trainparams)
 args = TrainingArguments(output_dir="./NLIMODEL",
                          load_best_model_at_end= True,
                          dataloader_pin_memory=True,
-                         per_device_train_batch_size=32,
-                         learning_rate=0.001,
+                         per_device_train_batch_size=16,
+                         learning_rate=2e-5,
                          weight_decay=0.01,
-                         num_train_epochs=30,
+                         num_train_epochs=3,
                          eval_strategy="epoch",
                          save_strategy="epoch"
                          )
