@@ -4,13 +4,13 @@ import shlex
 import uuid
 import os
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 import uvicorn
 import numpy as np
 import faiss
 import torch
 
-from run_inference import CodeT5Retriever
+import run_inference as run_inference_module
 
 
 def load_lines(path):
@@ -53,7 +53,9 @@ def create_app(args):
 
     index = build_index(emb)
 
-    retriever = CodeT5Retriever(args)
+    # provide module-level args expected by run_inference internals
+    run_inference_module.args = args
+    retriever = run_inference_module.CodeT5Retriever(args)
     retriever.prepare_model()
 
     device = retriever.device
@@ -67,7 +69,7 @@ def create_app(args):
         data = await request.json()
         question = data.get('question') or data.get('q')
         if not question:
-            return jsonify({'error': 'missing question field'}), 400
+            raise HTTPException(status_code=400, detail='missing question field')
 
         padded = pad_single(question, retriever.tokenizer)
         for k in padded:
@@ -88,15 +90,15 @@ def create_app(args):
         item['question'] = question
         # primary target: top-1 text
         primary_idx = top_indices[0] if top_indices else None
-        item['target'] = target_texts[primary_idx] if primary_idx is not None else ''
+        item['target'] =  ''
         # answers: include best text as single-item list
-        item['answers'] = [item['target']] if item['target'] else []
+        item['answers'] =  []
 
         # ctxs: include retrieved top-k entries with scores
         ctxs = []
         for idx, score in zip(top_indices, top_scores):
             ctxs.append({
-                'title': f'retrieved_{idx}',
+                'title': target_ids[idx],
                 'text': target_texts[idx],
                 'man_id': target_ids[idx]
             })
@@ -117,6 +119,10 @@ def parse_args(in_program_call=None):
     parser.add_argument('--port', type=int, default=5000)
     parser.add_argument('--cpu', action='store_true')
     parser.add_argument('--normalize_embed', action='store_true')
+    parser.add_argument('--log_level', type=str, default='verbose')
+    parser.add_argument('--sim_func', type=str, default='cls_distance.cosine')
+    parser.add_argument('--num_layers', type=int, default=12)
+    parser.add_argument('--pooler', choices=('cls', 'cls_before_pooler'), default='cls')
     args = parser.parse_args() if in_program_call is None else parser.parse_args(shlex.split(in_program_call))
     return args
 
