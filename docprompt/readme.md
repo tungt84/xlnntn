@@ -16,3 +16,8 @@ python run_reader_api.py --model_path <CHECKPOINT_PATH> --tokenizer_name <TOKENI
 Send the JSON returned by run_api.py (or example_fid_data.json) to get answers:
 curl -X POST -H "Content-Type: application/json" -d @example_fid_data.json http://localhost:5001/answer
 Next steps: I can run a quick smoke test (if you provide a model checkpoint and embeddings), or adjust output formatting to match any specific schema you want.
+
+
+Example run:
+
+./start_and_query.sh --retriever-args "--model_name MODEL --target_file data.txt --target_id_file data.id --target_embed_save_file embeddings" --reader-args "--model_path CHECKPOINT --tokenizer_name TOKENIZER" --question "Your question"

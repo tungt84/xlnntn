@@ -4,7 +4,8 @@ import shlex
 import uuid
 import os
 
-from flask import Flask, request, jsonify
+from fastapi import FastAPI, Request
+import uvicorn
 import numpy as np
 import faiss
 import torch
@@ -40,7 +41,7 @@ def pad_single(sentence, tokenizer):
 
 
 def create_app(args):
-    app = Flask(__name__)
+    app = FastAPI()
 
     # load target texts and ids
     target_texts = load_lines(args.target_file)
@@ -57,13 +58,13 @@ def create_app(args):
 
     device = retriever.device
 
-    @app.route('/health', methods=['GET'])
-    def health():
-        return jsonify({'status': 'ok'})
+    @app.get('/health')
+    async def health():
+        return {'status': 'ok'}
 
-    @app.route('/retrieve', methods=['POST'])
-    def retrieve():
-        data = request.get_json(force=True)
+    @app.post('/retrieve')
+    async def retrieve(request: Request):
+        data = await request.json()
         question = data.get('question') or data.get('q')
         if not question:
             return jsonify({'error': 'missing question field'}), 400
@@ -101,7 +102,7 @@ def create_app(args):
             })
         item['ctxs'] = ctxs
 
-        return jsonify([item])
+        return [item]
 
     return app
 
@@ -123,4 +124,4 @@ def parse_args(in_program_call=None):
 if __name__ == '__main__':
     args = parse_args()
     app = create_app(args)
-    app.run(host='0.0.0.0', port=args.port)
+    uvicorn.run(app, host='0.0.0.0', port=args.port)

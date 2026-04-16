@@ -1,7 +1,8 @@
 import argparse
 import shlex
 import json
-from flask import Flask, request, jsonify
+from fastapi import FastAPI, Request
+import uvicorn
 from pathlib import Path
 
 import torch
@@ -19,7 +20,7 @@ def clean_decoded(ans):
 
 
 def create_app(opt):
-    app = Flask(__name__)
+    app = FastAPI()
 
     # load tokenizer
     if 'codet5' in opt.tokenizer_name:
@@ -34,13 +35,13 @@ def create_app(opt):
     model = model.to(device)
     model.eval()
 
-    @app.route('/health', methods=['GET'])
-    def health():
-        return jsonify({'status': 'ok'})
+    @app.get('/health')
+    async def health():
+        return {'status': 'ok'}
 
-    @app.route('/answer', methods=['POST'])
-    def answer():
-        payload = request.get_json(force=True)
+    @app.post('/answer')
+    async def answer(request: Request):
+        payload = await request.json()
         # accept either a single item or list
         items = payload if isinstance(payload, list) else [payload]
 
@@ -100,7 +101,7 @@ def create_app(opt):
                     ans_list.append(clean_decoded(ans))
                 results.append({'question_id': ids[k], 'clean_code': ans_list})
 
-        return jsonify(results)
+        return results
 
     return app
 
@@ -129,4 +130,4 @@ def parse_args(in_program_call=None):
 if __name__ == '__main__':
     opt = parse_args()
     app = create_app(opt)
-    app.run(host='0.0.0.0', port=opt.port)
+    uvicorn.run(app, host='0.0.0.0', port=opt.port)

@@ -49,8 +49,8 @@ conda run -n genenv pip  install numpy==1.20.1  && \
 conda run -n genenv pip install astropy==4.2.1 --no-build-isolation 
 
 RUN conda run -n retenv pip install bert-score==0.3.11 && \
-conda run -n retenv pip install git+https://github.com/mkleehammer/pyodbc@4.0.0 && \
-conda run -n genenv pip install bert-score==0.3.11 && \
+conda run -n genenv pip install bert-score==0.3.11 
+RUN conda run -n retenv pip install git+https://github.com/mkleehammer/pyodbc@4.0.0 && \
 conda run -n genenv pip install git+https://github.com/mkleehammer/pyodbc@4.0.0
 
 RUN conda run -n retenv pip install git+https://github.com/anaconda-graveyard/clyent@1.2.2 && \
